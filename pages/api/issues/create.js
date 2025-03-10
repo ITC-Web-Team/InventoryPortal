@@ -20,9 +20,9 @@ export default async function handler(req, res) {
     }
 
     // Validate roll number format (optional)
-    if (!/^\d{2}[a-zA-Z]\d{4}$/.test(rollNumber)) {
+    if (!/^.{1,20}$/.test(rollNumber.trim())) {
       return res.status(400).json({
-        message: 'Invalid roll number format'
+        message: 'Invalid roll number format. It should be 1-20 characters.'
       })
     }
 
