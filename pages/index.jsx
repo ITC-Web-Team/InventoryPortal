@@ -1,9 +1,41 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { LogIn } from 'lucide-react'
+import { LogIn, User } from 'lucide-react'
+import { setUserData } from '../utils/auth'
+import { useRouter } from 'next/router'
+import { useEffect } from 'react'
+import { isAuthenticated } from '../utils/auth'
 
 export default function LabInventoryLoginPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    // Redirect to inventory if already authenticated
+    if (isAuthenticated()) {
+      router.push('/inventory')
+    }
+  }, [router])
+
+  const handleGuestLogin = () => {
+    try {
+      const guestData = {
+        name: 'Guest User',
+        roll: 'guest',
+        department: 'Guest',
+        degree: 'Guest',
+        passing_year: new Date().getFullYear(),
+        isAdmin: false,
+        lastLogin: new Date().toISOString()
+      }
+      setUserData(guestData)
+      router.push('/inventory')
+    } catch (error) {
+      console.error('Error during guest login:', error)
+      alert('Failed to login as guest. Please try again.')
+    }
+  }
+
   return (
     <div className='min-h-[90vh] flex items-center justify-center'>
       {/* Background Pattern */}
@@ -46,8 +78,20 @@ export default function LabInventoryLoginPage() {
             Login with SSO
           </motion.a>
 
+          {/* Guest Login Button */}
+          <motion.button
+            className="group relative overflow-hidden bg-gray-100 hover:bg-gray-200 text-gray-700 px-8 py-3 rounded-xl inline-flex items-center justify-center w-full font-medium transition-colors mt-4"
+            onClick={handleGuestLogin}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <User className="w-5 h-5 mr-2" />
+            Continue as Guest
+          </motion.button>
+
           {/* Footer */}
           <div className="mt-8 text-sm text-gray-500">
+            <p>Guest users have limited access to inventory features</p>
           </div>
         </div>
       </motion.div>

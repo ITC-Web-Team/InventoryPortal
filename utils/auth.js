@@ -1,30 +1,81 @@
-export const isAdmin = (userData) => {
-  // Check if user has admin role from SSO data
-  if (!userData) return false
+export const isAdmin = (userDataOrRequest) => {
+  // If it's a request object (server-side)
+  if (userDataOrRequest?.cookies) {
+    const isAdminCookie = userDataOrRequest.cookies.get('isAdmin')?.value
+    return isAdminCookie === 'true'
+  }
 
-  // You can customize these conditions based on your SSO data structure
+  // If it's user data (client-side)
+  if (!userDataOrRequest) return false
+
   return (
-    userData.roles?.includes('admin') ||
-    userData.isAdmin === true ||
-    userData.department === 'ITC' // Or any other department that should have admin access
+    userDataOrRequest.roles?.includes('admin') ||
+    userDataOrRequest.isAdmin === true ||
+    userDataOrRequest.department === 'ITC'
   )
 }
 
-export function isAdmin(request) {
-  // Check if the user has admin status in localStorage
-  // For server-side middleware, we'll check cookies instead
-  const isAdminCookie = request.cookies.get('isAdmin')?.value
-  return isAdminCookie === 'true'
+export const isGuest = (userData) => {
+  return userData?.roll === 'guest'
 }
 
-export function clearAdminStatus() {
-  localStorage.removeItem('isAdmin')
-  // Also clear the cookie
+export const isAuthenticated = () => {
+  if (typeof window === 'undefined') return false
+  const userData = localStorage.getItem('userdata')
+  return !!userData
+}
+
+export const getUserData = () => {
+  if (typeof window === 'undefined') return null
+  const userData = localStorage.getItem('userdata')
+  return userData ? JSON.parse(userData) : null
+}
+
+export const setUserData = (data) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem('userdata', JSON.stringify(data))
+}
+
+export const clearUserData = () => {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem('userdata')
   document.cookie = 'isAdmin=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
 }
 
-export function setAdminStatus() {
+export const setAdminStatus = () => {
+  if (typeof window === 'undefined') return
   localStorage.setItem('isAdmin', 'true')
-  // Also set a cookie for server-side checks
   document.cookie = 'isAdmin=true; path=/'
+}
+
+export const clearAdminStatus = () => {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem('isAdmin')
+  document.cookie = 'isAdmin=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+}
+
+export const requireAuth = (router) => {
+  if (!isAuthenticated()) {
+    router.push('/')
+    return false
+  }
+  return true
+}
+
+export const requireAdmin = (router) => {
+  const userData = getUserData()
+  if (!isAdmin(userData)) {
+    router.push('/inventory')
+    return false
+  }
+  return true
+}
+
+export const requireNonGuest = (router) => {
+  const userData = getUserData()
+  if (isGuest(userData)) {
+    router.push('/inventory')
+    return false
+  }
+  return true
 } 
