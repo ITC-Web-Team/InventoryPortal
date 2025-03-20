@@ -6,6 +6,7 @@ import axios from 'axios';
 import { LogOut, Package, Clock, ArrowLeft, Check, X, User, Mail, Building, GraduationCap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
+import { getUserData, clearUserData, isGuest, requireAuth } from '../../utils/auth';
 
 export default function ProfilePage() {
   const [issues, setIssues] = useState([]);
@@ -32,15 +33,16 @@ export default function ProfilePage() {
 
   useEffect(() => {
     setMounted(true)
-    const storedUserData = localStorage.getItem('userdata')
-    if (storedUserData) {
-      const parsedUserData = JSON.parse(storedUserData)
-      setUserData(parsedUserData)
-      if (parsedUserData?.roll) {
-        fetchUserIssues(parsedUserData.roll)
+    if (!requireAuth(router)) return
+
+    const userData = getUserData()
+    if (userData) {
+      setUserData(userData)
+      if (!isGuest(userData)) {
+        fetchUserIssues(userData.roll)
+      } else {
+        setLoading(false)
       }
-    } else {
-      router.push('/')
     }
   }, [router])
 
@@ -50,13 +52,17 @@ export default function ProfilePage() {
     }
   }, [userData]);
 
+  const handleLogout = () => {
+    clearUserData()
+    router.push('/')
+  }
+
   const handleReturn = async (issueId) => {
     try {
       const response = await axios.post('/api/issues/return', { issueId });
 
       if (response.data) {
-        // Refresh issues list
-        await fetchUserIssues();
+        await fetchUserIssues(userData.roll);
         alert('Item returned successfully!');
       }
     } catch (error) {
@@ -90,10 +96,7 @@ export default function ProfilePage() {
 
         <button
           className="btn-danger flex items-center"
-          onClick={() => {
-            localStorage.removeItem('userdata');
-            router.push('/');
-          }}
+          onClick={handleLogout}
         >
           <LogOut className="w-5 h-5 mr-2" />
           Logout
@@ -114,21 +117,23 @@ export default function ProfilePage() {
                 {userData?.name || 'User'}
               </h2>
               <p className="text-gray-500">
-                {userData?.roll || 'No Roll Number'}
+                {isGuest(userData) ? 'Guest User' : userData?.roll || 'No Roll Number'}
               </p>
             </div>
           </div>
 
           {/* User Details List */}
           <div className="space-y-4">
-            {/* Email */}
-            <div className="flex items-start gap-3">
-              <Mail className="w-5 h-5 text-blue-500 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Email</p>
-                <p className="text-gray-800">{userData?.roll || 'N/A'}@iitb.ac.in</p>
+            {/* Email - Only show for non-guest users */}
+            {!isGuest(userData) && (
+              <div className="flex items-start gap-3">
+                <Mail className="w-5 h-5 text-blue-500 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Email</p>
+                  <p className="text-gray-800">{userData?.roll || 'N/A'}@iitb.ac.in</p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Department */}
             <div className="flex items-start gap-3">
@@ -139,97 +144,93 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Course Details */}
-            <div className="flex items-start gap-3">
-              <GraduationCap className="w-5 h-5 text-blue-500 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Program</p>
-                <p className="text-gray-800">
-                  {userData?.degree || 'N/A'}
-                </p>
-              </div>
-            </div>
-
-            {/* Additional SSO Data */}
-            {userData?.ssoData && (
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="text-sm font-medium text-gray-600 mb-3">Additional Information</h3>
-                <div className="space-y-2 text-sm">
-                  {Object.entries(userData.ssoData).map(([key, value]) => (
-                    key !== 'name' && key !== 'email' && (
-                      <div key={key} className="flex justify-between">
-                        <span className="text-gray-600 capitalize">
-                          {key.replace(/_/g, ' ')}:
-                        </span>
-                        <span className="text-gray-800">{value}</span>
-                      </div>
-                    )
-                  ))}
+            {/* Course Details - Only show for non-guest users */}
+            {!isGuest(userData) && (
+              <div className="flex items-start gap-3">
+                <GraduationCap className="w-5 h-5 text-blue-500 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Program</p>
+                  <p className="text-gray-800">
+                    {userData?.degree || 'N/A'}
+                  </p>
                 </div>
               </div>
             )}
+
+            {/* Last Login */}
+            <div className="flex items-start gap-3">
+              <Clock className="w-5 h-5 text-blue-500 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Last Login</p>
+                <p className="text-gray-800">
+                  {new Date(userData?.lastLogin).toLocaleString() || 'N/A'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Issues Summary */}
-        <div className="md:col-span-2">
-          <h3 className="text-lg font-semibold mb-4">Issued Items</h3>
+        {/* Issues Summary - Only show for non-guest users */}
+        {!isGuest(userData) && (
+          <div className="md:col-span-2">
+            <h3 className="text-lg font-semibold mb-4">Issued Items</h3>
 
-          {issues.length === 0 ? (
-            <div className="card p-6 text-center text-gray-500">
-              No items currently issued
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {issues.map((issue) => (
-                <div
-                  key={issue.id}
-                  className="card p-4 flex flex-col md:flex-row justify-between md:items-center gap-4"
-                >
-                  <div className="flex-grow">
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-medium text-gray-800">
-                        {issue.itemName}
-                      </h4>
-                      <span className={`
-                        px-2 py-1 rounded-full text-xs flex items-center gap-1
-                        ${issue.returned ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
-                      `}>
-                        {issue.returned ? (
-                          <>
-                            <Check className="w-3 h-3" />
-                            Returned
-                          </>
-                        ) : (
-                          <>
-                            <X className="w-3 h-3" />
-                            Pending
-                          </>
-                        )}
-                      </span>
-                    </div>
+            {issues.length === 0 ? (
+              <div className="card p-6 text-center text-gray-500">
+                No items currently issued
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {issues.map((issue) => (
+                  <div
+                    key={issue.id}
+                    className="card p-4 flex flex-col md:flex-row justify-between md:items-center gap-4"
+                  >
+                    <div className="flex-grow">
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-gray-800">
+                          {issue.itemName}
+                        </h4>
+                        <span className={`
+                          px-2 py-1 rounded-full text-xs flex items-center gap-1
+                          ${issue.returned ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
+                        `}>
+                          {issue.returned ? (
+                            <>
+                              <Check className="w-3 h-3" />
+                              Returned
+                            </>
+                          ) : (
+                            <>
+                              <X className="w-3 h-3" />
+                              Pending
+                            </>
+                          )}
+                        </span>
+                      </div>
 
-                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <Package className="w-4 h-4 mr-1" />
-                        Quantity: {issue.quantity}
-                      </div>
-                      <div className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        Issued: {new Date(issue.issueDate).toLocaleDateString()}
-                      </div>
-                      {issue.daysToReturn > 0 && !issue.returned && (
-                        <div className="text-yellow-600">
-                          Return within {issue.daysToReturn} days
+                      <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <Package className="w-4 h-4 mr-1" />
+                          Quantity: {issue.quantity}
                         </div>
-                      )}
+                        <div className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          Issued: {new Date(issue.issueDate).toLocaleDateString()}
+                        </div>
+                        {issue.daysToReturn > 0 && !issue.returned && (
+                          <div className="text-yellow-600">
+                            Return within {issue.daysToReturn} days
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
